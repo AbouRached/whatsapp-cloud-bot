@@ -1,35 +1,46 @@
+// index.js
 const express = require('express');
-const axios = require('axios');
+const bodyParser = require('body-parser');
+require('dotenv').config();
+
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+app.use(bodyParser.json());
 
-const token = 'YOUR_ACCESS_TOKEN';
-const phoneNumberId = 'YOUR_PHONE_NUMBER_ID';
+// Webhook verification
+app.get('/webhook', (req, res) => {
+  const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 
-app.post('/webhook', async (req, res) => {
-    const entry = req.body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const message = changes?.value?.messages?.[0];
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
 
-    if (message) {
-        const from = message.from;
-        const text = message.text?.body || 'Received';
-
-        await axios.post(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
-            messaging_product: "whatsapp",
-            to: from,
-            text: { body: `You said: ${text}` }
-        }, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+  if (mode && token) {
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+      console.log('WEBHOOK_VERIFIED');
+      res.status(200).send(challenge);
+    } else {
+      res.sendStatus(403);
     }
-
-    res.sendStatus(200);
+  }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Webhook running on port ${PORT}`));
+// Webhook listener
+app.post('/webhook', (req, res) => {
+  const body = req.body;
+
+  if (body.object) {
+    console.log('Received webhook:', JSON.stringify(body, null, 2));
+
+    // Process the message here if needed
+
+    res.sendStatus(200);
+  } else {
+    res.sendStatus(404);
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
